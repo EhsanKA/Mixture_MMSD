@@ -25,7 +25,7 @@ def three_tensor_product(a,b,c):
 
 
 def second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, e):
-    # e = np.eye(W_hat.shape[0])
+    e = np.eye(W_hat.shape[0])
     s = np.zeros((W_hat.shape[1]**3))
     for i in range(W_hat.shape[0]):
         s1= three_tensor_product(np.dot(W_hat.T, mu_hat_second), np.dot(W_hat.T, e[:, i]), np.dot(W_hat.T, e[:, i]) )
@@ -36,29 +36,31 @@ def second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, e):
     return sigma_hat* s
 
 # Generating samples
-d= 3
-k= 2
-n= 60
+d= 7
+k= 3
+n= 500
 
 W = np.random.uniform(0,1,k)
-W = W/np.sum(W)
-Means = []
+W = W/sum(W)
+Means = np.zeros((d,k))
 
 # Genetating means
 for i in range(k):
     mean_j = np.random.uniform(-10, 10, d)
-    Means.append(mean_j)
+    Means[:, i]= mean_j
+    # Means.append(mean_j)
 
 # select each sample comes from which Gaussian
 which_gaussian = np.random.choice(k, n, p=W)
 which_gaussian = which_gaussian.tolist()
 # same sigmas
-sigma = np.random.uniform(0,100)
+sigma = np.random.uniform(0,10)
 
 X = []
 for i in which_gaussian:
-    z = np.random.multivariate_normal(Means[i], sigma*np.eye(d))
-    X.append(z)
+
+    z = np.random.multivariate_normal(np.zeros((d)), sigma*np.eye(d))
+    X.append(z+ Means[:, i])
 
 X= np.array((X))
 mu_hat = np.mean(X[0:int(n / 2), :], axis=0)
@@ -80,42 +82,77 @@ M3_hat_second = M3_hat_second.reshape((d,d,d))
 
 mu_hat_second = np.mean(X[int(n / 2):, :], axis=0)
 
-v, _ = np.linalg.eig(M2 - np.dot(mu_hat_second, mu_hat_second.T))
+v, _ = np.linalg.eig(M2 - np.dot(mu_hat, mu_hat.T))
 
 # predicting the variance
-sigma_hat = v[k-1]
+sigma_hat = (-np.sort(-v)[k])
 
 u, s, vh = np.linalg.svd(M2 - sigma_hat*np.eye(d), full_matrices=False)
 M2_hat = np.dot(np.dot(u[:, :k], np.diag(s[:k])), vh[:k, :])
 eigvalues, eigvectors = np.linalg.eig(M2_hat)
 U_hat = u[:, :k]
-W_hat = np.dot(U_hat, (sp.linalg.sqrtm(abs(np.linalg.pinv(np.dot(np.dot(U_hat.T, M2_hat), U_hat))))))
-B_hat = np.dot(U_hat, (sp.linalg.sqrtm(abs(np.dot(np.dot(U_hat.T, M2_hat), U_hat)))))
+W_hat = np.dot(U_hat, (sp.linalg.sqrtm((np.linalg.pinv(np.dot(np.dot(U_hat.T, M2_hat), U_hat))))))
+B_hat = np.dot(U_hat, (sp.linalg.sqrtm((np.dot(np.dot(U_hat.T, M2_hat), U_hat)))))
 
 # Second half of data
 
 M_hat_www_second = third_order_tensor(M3_hat_second,W_hat,W_hat,W_hat) - second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, eigvectors)
 
-for t in range(1):
-    theta = np.zeros((k))
+def find_min(eigenvalues):
+    a = []
+    for i in range(eigenvalues.shape[0]):
+        a.append(abs(eigenvalues[i]))
+        for j in range(i):
+            a.append(abs(eigenvalues[i]- eigenvalues[j]))
+    return min(a)
+
+min_value = 0
+vectors = None
+values = None
+theta = np.zeros((k))
+tt = np.zeros((k))
+for t in range(100):
     bound = 0
     for i in range(k):
-        c = np.random.uniform(-np.sqrt(1 - bound**2),np.sqrt(1 - bound**2))
+        c = np.random.uniform(-np.sqrt(1 - bound**2), np.sqrt(1- bound**2))
         theta[i] = c
         bound = np.linalg.norm(theta)
-        if bound >=1:
+        if bound >= 1:
+            theta /= bound
             break
-last_squared_matrix = np.dot(M_hat_www_second, theta)
-eigvals, eigvecs = np.linalg.eig(last_squared_matrix)
+    # theta = np.random.uniform(-1,1,k)
+    # theta /= np.linalg.norm(theta)
+    last_squared_matrix = np.dot(M_hat_www_second, theta)
+    eigvals, eigvecs = np.linalg.eig(last_squared_matrix)
+    if min_value < find_min(eigvals):
+        tt = theta
+        min_value = find_min(eigvals)
+        vectors = eigvecs
+        values = eigvals
 
 
 print("sigma is: ", sigma_hat)
 mus = np.zeros((d,k))
 for i in range(k):
-    mus[:, i] = (eigvals[i]/ (np.dot(theta.T, eigvecs[i])))* np.dot(B_hat, eigvecs[i])
+    mus[:, i] = (values[i]/ (np.dot(tt.T, vectors[i])))* np.dot(B_hat, vectors[i])
 
 w = np.dot(np.linalg.pinv(mus), mu_hat)
+w = abs(w)
+w/= sum(w)
 
 print("Mu is: ", mus)
 print("W is: ", w)
 
+
+# test with gmm
+
+from sklearn import mixture
+
+clf = mixture.GaussianMixture(n_components=k, covariance_type='spherical')
+clf.fit(X)
+
+print("means using EM: ", clf.means_.T)
+
+print("covariances using EM: ", clf.covariances_)
+
+print("Weights using EM: ", clf.weights_)
