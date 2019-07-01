@@ -24,8 +24,8 @@ def three_tensor_product(a,b,c):
     return c
 
 
-def second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second):
-    e = np.eye(W_hat.shape[0])
+def second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, e):
+    # e = np.eye(W_hat.shape[0])
     s = np.zeros((W_hat.shape[1]**3))
     for i in range(W_hat.shape[0]):
         s1= three_tensor_product(np.dot(W_hat.T, mu_hat_second), np.dot(W_hat.T, e[:, i]), np.dot(W_hat.T, e[:, i]) )
@@ -87,14 +87,14 @@ sigma_hat = v[k-1]
 
 u, s, vh = np.linalg.svd(M2 - sigma_hat*np.eye(d), full_matrices=False)
 M2_hat = np.dot(np.dot(u[:, :k], np.diag(s[:k])), vh[:k, :])
-
+eigvalues, eigvectors = np.linalg.eig(M2_hat)
 U_hat = u[:, :k]
 W_hat = np.dot(U_hat, (sp.linalg.sqrtm(abs(np.linalg.pinv(np.dot(np.dot(U_hat.T, M2_hat), U_hat))))))
 B_hat = np.dot(U_hat, (sp.linalg.sqrtm(abs(np.dot(np.dot(U_hat.T, M2_hat), U_hat)))))
 
 # Second half of data
 
-M_hat_www_second = third_order_tensor(M3_hat_second,W_hat,W_hat,W_hat) - second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second)
+M_hat_www_second = third_order_tensor(M3_hat_second,W_hat,W_hat,W_hat) - second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, eigvectors)
 
 for t in range(1):
     theta = np.zeros((k))
@@ -105,4 +105,17 @@ for t in range(1):
         bound = np.linalg.norm(theta)
         if bound >=1:
             break
+last_squared_matrix = np.dot(M_hat_www_second, theta)
+eigvals, eigvecs = np.linalg.eig(last_squared_matrix)
+
+
+print("sigma is: ", sigma_hat)
+mus = np.zeros((d,k))
+for i in range(k):
+    mus[:, i] = (eigvals[i]/ (np.dot(theta.T, eigvecs[i])))* np.dot(B_hat, eigvecs[i])
+
+w = np.dot(np.linalg.pinv(mus), mu_hat)
+
+print("Mu is: ", mus)
+print("W is: ", w)
 
