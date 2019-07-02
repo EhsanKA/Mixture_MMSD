@@ -3,7 +3,7 @@ import scipy as sp
 
 
 def third_order_tensor(Y,U,V,W):
-    output= np.zeros(shape=(U.shape[1], U.shape[1], U.shape[1]))
+    output= np.zeros(shape=(U.shape[1], V.shape[1], W.shape[1]))
     for j1 in range(output.shape[0]):
         for j2 in range(output.shape[1]):
             for j3 in range(output.shape[2]):
