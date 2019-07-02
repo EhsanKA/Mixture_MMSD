@@ -96,7 +96,17 @@ B_hat = np.dot(U_hat, (sp.linalg.sqrtm((np.dot(np.dot(U_hat.T, M2_hat), U_hat)))
 
 # Second half of data
 
-M_hat_www_second = third_order_tensor(M3_hat_second,W_hat,W_hat,W_hat) - second_part_of_third_order_tensor(sigma_hat, W_hat, mu_hat_second, eigvectors)
+def second_part_of_third_order_tensor2(sigma_hat, W_hat, mu_hat_second, e, theta):
+    e = np.eye(W_hat.shape[0])
+    s = np.zeros((W_hat.shape[1]**3))
+    for i in range(W_hat.shape[0]):
+        s1= three_tensor_product(np.dot(W_hat.T, mu_hat_second), np.dot(W_hat.T, e[:, i]), np.dot(theta, np.dot(W_hat.T, e[:, i])) )
+        s2= three_tensor_product(np.dot(theta, np.dot(W_hat.T, e[:, i])), np.dot(W_hat.T, mu_hat_second), np.dot(W_hat.T, e[:, i]) )
+        s3= three_tensor_product(np.dot(W_hat.T, e[:, i]), np.dot(theta, np.dot(W_hat.T, e[:, i])), np.dot(W_hat.T, mu_hat_second) )
+        s+= (s1+ s2+ s3)
+    s = s.reshape((W_hat.shape[1],W_hat.shape[1],W_hat.shape[1]))
+    return sigma_hat* s
+
 
 def find_min(eigenvalues):
     a = []
@@ -122,13 +132,21 @@ for t in range(100):
             break
     # theta = np.random.uniform(-1,1,k)
     # theta /= np.linalg.norm(theta)
-    last_squared_matrix = np.dot(M_hat_www_second, theta)
+    M_hat_www_second = third_order_tensor(M3_hat_second, W_hat, W_hat,
+                                          np.dot(W_hat, theta)) - second_part_of_third_order_tensor2(sigma_hat, W_hat,
+                                                                                                     mu_hat_second,
+                                                                                                     eigvectors)
+    # last_squared_matrix = np.dot(M_hat_www_second, theta)
+    last_squared_matrix = M_hat_www_second
     eigvals, eigvecs = np.linalg.eig(last_squared_matrix)
     if min_value < find_min(eigvals):
         tt = theta
         min_value = find_min(eigvals)
         vectors = eigvecs
         values = eigvals
+
+
+
 
 
 print("sigma is: ", sigma_hat)
